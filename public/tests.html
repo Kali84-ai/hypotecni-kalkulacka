@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testy výpočtů</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap" style="padding-top:20px">
+  <h1>Testy výpočetního jádra</h1>
+  <p id="summary" class="muted">Probíhá…</p>
+  <div class="panel table-scroll">
+    <table>
+      <thead><tr><th class="text">Test</th><th>Očekáváno</th><th>Výsledek</th><th>Stav</th></tr></thead>
+      <tbody id="out"></tbody>
+    </table>
+  </div>
+</div>
+<script src="js/calc.js"></script>
+<script>
+(function () {
+  var C = window.HypoCalc;
+  var out = document.getElementById('out');
+  var passed = 0, failed = 0;
+
+  function check(name, expected, actual, tol) {
+    var ok = Math.abs(expected - actual) <= (tol || 0);
+    ok ? passed++ : failed++;
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td class="text"></td><td></td><td></td><td><span class="status ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'OK' : 'CHYBA') + '</span></td>';
+    tr.children[0].textContent = name;
+    tr.children[1].textContent = expected;
+    tr.children[2].textContent = Math.round(actual * 10000) / 10000;
+    out.appendChild(tr);
+  }
+
+  // Anuita: 3 000 000 Kč, 5 % p.a., 30 let → 16 104,65 Kč
+  check('Anuitní splátka 3 mil. / 5 % / 30 let', 16104.65, C.annuity(3000000, 5, 360), 0.01);
+  // Nulová sazba
+  check('Anuitní splátka při 0 %', 10000, C.annuity(1200000, 0, 120), 1e-9);
+
+  // Kalendář: součet jistiny = úvěr, zůstatek na konci 0
+  var rows = C.schedule({ principal: 3000000, rate: 5, months: 360 });
+  check('Kalendář: počet splátek', 360, rows.length);
+  check('Kalendář: splacená jistina = úvěr', 3000000, C.sum(rows, 'principal'), 0.01);
+  check('Kalendář: zůstatek na konci', 0, rows[rows.length - 1].balance, 0.01);
+  check('Kalendář: celkové úroky', 16104.65 * 360 - 3000000, C.sum(rows, 'interest'), 2);
+
+  // Zůstatek po fixaci – analyticky vs. z kalendáře
+  check('Zůstatek po 5 letech (vzorec = kalendář)', rows[59].balance, C.balanceAfter(3000000, 5, 360, 60), 0.01);
+
+  // RPSN bez poplatků = efektivní roční sazba (1 + i/12)^12 − 1
+  var eff = (Math.pow(1 + 0.05 / 12, 12) - 1) * 100;
+  check('RPSN bez poplatků = efektivní sazba (5 % → 5,116 %)', eff, C.apr(C.aprFlows(3000000, 5, 360, {})), 1e-6);
+  check('RPSN zaokrouhlená na 1 des. místo', 5.1, C.aprRounded(3000000, 5, 360, {}), 1e-9);
+
+  // RPSN s poplatky musí být vyšší
+  var withFees = C.apr(C.aprFlows(3000000, 5, 360, { upfront: 15000, monthly: 150 }));
+  check('RPSN s poplatky > efektivní sazba', 1, withFees > eff ? 1 : 0);
+
+  // Kontrola RPSN přes čistou současnou hodnotu: při nalezené RPSN je NPV ≈ 0
+  var flows = C.aprFlows(2500000, 4.89, 300, { upfront: 9000, monthly: 349 });
+  var x = C.apr(flows) / 100;
+  var npv = flows.reduce(function (a, f) { return a + f.amount * Math.pow(1 + x, -f.t); }, 0);
+  check('NPV při nalezené RPSN ≈ 0', 0, npv, 1e-4);
+
+  // Mimořádné splátky – zkrácení doby
+  var shorter = C.schedule({ principal: 3000000, rate: 5, months: 360, extraYearly: 100000, extraMode: 'term' });
+  check('Mimořádné splátky zkrátí dobu', 1, shorter.length < 360 ? 1 : 0);
+  check('Mimořádné splátky: jistina + mimořádné = úvěr', 3000000, C.sum(shorter, 'principal') + C.sum(shorter, 'extra'), 0.01);
+  // Mimořádné splátky – snížení splátky
+  var lower = C.schedule({ principal: 3000000, rate: 5, months: 360, extraYearly: 20000, extraMode: 'payment' });
+  check('Režim „nižší splátka“: počet splátek beze změny', 360, lower.length);
+  check('Režim „nižší splátka“: splátka ve 2. roce nižší', 1, lower[12].payment < rows[12].payment ? 1 : 0);
+
+  // Obrácená úloha: výše úvěru ze splátky
+  check('Úvěr ze splátky (inverze anuity)', 3000000, C.principalFromPayment(C.annuity(3000000, 5, 360), 5, 360), 0.01);
+
+  // Daňový odpočet s limitem
+  var ys = C.yearly(rows);
+  var tax = C.taxSavings(ys, 150000, 0.15);
+  check('Daňová úspora 1. rok (úroky ~149 tis. pod limitem)', Math.min(ys[0].interest, 150000) * 0.15, tax[0], 1e-6);
+  check('Daňová úspora omezena limitem', 22500, C.taxSavings([{ interest: 400000 }], 150000, 0.15)[0], 1e-9);
+
+  document.getElementById('summary').textContent = 'Úspěšné: ' + passed + ', neúspěšné: ' + failed;
+  document.getElementById('summary').className = failed ? 'status bad' : 'status ok';
+})();
+</script>
+</body>
+</html>

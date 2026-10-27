@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hypoteční kalkulačka</title>
+<meta name="description" content="Orientační hypoteční kalkulačka: splátka, RPSN podle zákona č. 257/2016 Sb., reprezentativní příklad, limity ČNB, splátkový kalendář a další informace k financování bydlení.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 2 15h4v13h8v-8h4v8h8V15h4z' fill='%231f5fbf'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <h1>Hypoteční kalkulačka</h1>
+    <p>Spočítejte si splátku, RPSN a celkové náklady hypotéky. Výpočet probíhá jen ve vašem prohlížeči, žádné údaje se nikam neodesílají.</p>
+  </div>
+</header>
+
+<div class="wrap layout">
+
+  <!-- ===================== FORMULÁŘ ===================== -->
+  <aside class="panel form-panel" aria-label="Parametry hypotéky">
+    <form id="form" novalidate>
+      <fieldset>
+        <legend>Nemovitost a úvěr</legend>
+        <div class="field">
+          <label for="price">Kupní cena nemovitosti</label>
+          <div class="input-unit"><input id="price" inputmode="numeric" data-format="kc" autocomplete="off"><span class="unit">Kč</span></div>
+        </div>
+        <div class="field">
+          <label for="own">Vlastní zdroje <span class="muted" id="ownShare"></span></label>
+          <div class="input-unit"><input id="own" inputmode="numeric" data-format="kc" autocomplete="off"><span class="unit">Kč</span></div>
+          <input type="range" id="ownRange" min="0" step="10000" aria-label="Vlastní zdroje – posuvník">
+        </div>
+        <div class="derived"><span>Výše úvěru</span><strong id="loanDerived"></strong></div>
+        <div class="field" style="margin-top:12px">
+          <label for="collateral">Hodnota zajištění (odhad banky)</label>
+          <div class="input-unit"><input id="collateral" inputmode="numeric" data-format="kc" autocomplete="off" placeholder="= kupní cena"><span class="unit">Kč</span></div>
+          <div class="hint">Banka počítá LTV z ceny určené odhadem, ta může být nižší než kupní cena. Nevyplněno = kupní cena.</div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="purpose">Účel</label>
+            <select id="purpose">
+              <option value="own">Vlastní bydlení</option>
+              <option value="investment">Investiční (pronájem nebo třetí a další nemovitost)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="age">Věk žadatele</label>
+            <div class="input-unit"><input id="age" inputmode="numeric" autocomplete="off"><span class="unit">let</span></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Podmínky úvěru</legend>
+        <div class="field">
+          <label for="fix">Délka fixace úrokové sazby</label>
+          <select id="fix"></select>
+        </div>
+        <div class="field">
+          <label for="rate">Úroková sazba</label>
+          <div class="input-unit"><input id="rate" inputmode="decimal" autocomplete="off"><span class="unit">% p.a.</span></div>
+          <div class="hint">Předvyplněno průměrem trhu (<span id="rateSource"></span>). Nahraďte nabídkou své banky.</div>
+        </div>
+        <div class="field">
+          <label for="term">Doba splatnosti <span class="muted" id="termValue"></span></label>
+          <div class="input-unit"><input id="term" inputmode="numeric" autocomplete="off"><span class="unit">let</span></div>
+          <input type="range" id="termRange" min="5" step="1" aria-label="Doba splatnosti – posuvník">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Poplatky a pojištění</legend>
+        <div class="row2">
+          <div class="field">
+            <label for="feeProcessing">Zpracování úvěru</label>
+            <div class="input-unit"><input id="feeProcessing" inputmode="numeric" data-format="kc"><span class="unit">Kč</span></div>
+          </div>
+          <div class="field">
+            <label for="feeAppraisal">Odhad nemovitosti</label>
+            <div class="input-unit"><input id="feeAppraisal" inputmode="numeric" data-format="kc"><span class="unit">Kč</span></div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="feeAccount">Vedení úvěrového účtu</label>
+          <div class="input-unit"><input id="feeAccount" inputmode="numeric" data-format="kc"><span class="unit">Kč/měs.</span></div>
+        </div>
+        <div class="field">
+          <label for="insProperty">Pojištění nemovitosti</label>
+          <div class="input-unit"><input id="insProperty" inputmode="numeric" data-format="kc"><span class="unit">Kč/rok</span></div>
+          <label class="check"><input type="checkbox" id="insPropertyApr"> Pojištění je podmínkou úvěru (i u jiného pojistitele) – započítat do RPSN</label>
+        </div>
+        <div class="field">
+          <label for="insLife">Pojištění schopnosti splácet</label>
+          <div class="input-unit"><input id="insLife" inputmode="numeric" data-format="kc"><span class="unit">Kč/měs.</span></div>
+          <label class="check"><input type="checkbox" id="insLifeApr"> Je podmínkou úvěru – započítat do RPSN</label>
+        </div>
+        <div class="field">
+          <label for="agentFee">Provize realitní kanceláře</label>
+          <div class="input-unit"><input id="agentFee" inputmode="numeric" data-format="kc"><span class="unit">Kč</span></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Příjmy domácnosti</legend>
+        <div class="field">
+          <label for="income">Čistý měsíční příjem</label>
+          <div class="input-unit"><input id="income" inputmode="numeric" data-format="kc" placeholder="nepovinné"><span class="unit">Kč</span></div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="otherPayments">Jiné splátky</label>
+            <div class="input-unit"><input id="otherPayments" inputmode="numeric" data-format="kc"><span class="unit">Kč/měs.</span></div>
+          </div>
+          <div class="field">
+            <label for="otherDebt">Jiné dluhy celkem</label>
+            <div class="input-unit"><input id="otherDebt" inputmode="numeric" data-format="kc"><span class="unit">Kč</span></div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="taxRate">Sazba daně z příjmů</label>
+          <select id="taxRate">
+            <option value="0.15">15 %</option>
+            <option value="0.23">23 % (příjmy nad 36násobek průměrné mzdy)</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Mimořádné splátky</legend>
+        <div class="field">
+          <label for="extraYearly">Mimořádná splátka každý rok</label>
+          <div class="input-unit"><input id="extraYearly" inputmode="numeric" data-format="kc"><span class="unit">Kč</span></div>
+        </div>
+        <div class="field">
+          <label for="extraMode">Po mimořádné splátce</label>
+          <select id="extraMode">
+            <option value="term">zkrátit dobu splácení</option>
+            <option value="payment">snížit měsíční splátku</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Nájem vs. hypotéka</legend>
+        <div class="row2">
+          <div class="field">
+            <label for="rent">Srovnatelný nájem</label>
+            <div class="input-unit"><input id="rent" inputmode="numeric" data-format="kc"><span class="unit">Kč/měs.</span></div>
+          </div>
+          <div class="field">
+            <label for="appreciation">Růst ceny nem.</label>
+            <div class="input-unit"><input id="appreciation" inputmode="decimal"><span class="unit">%/rok</span></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <button type="button" id="reset">Obnovit výchozí hodnoty</button>
+    </form>
+  </aside>
+
+  <!-- ===================== VÝSLEDKY ===================== -->
+  <main aria-live="polite">
+    <section class="cards" aria-label="Hlavní výsledky">
+      <div class="card primary">
+        <div class="label">Měsíční splátka</div>
+        <div class="value" id="outPayment"></div>
+        <div class="sub" id="outPaymentSub"></div>
+      </div>
+      <div class="card">
+        <div class="label">RPSN</div>
+        <div class="value" id="outApr"></div>
+        <div class="sub" id="outAprSub"></div>
+      </div>
+      <div class="card">
+        <div class="label">Celková splatná částka</div>
+        <div class="value" id="outTotal"></div>
+        <div class="sub" id="outTotalSub"></div>
+      </div>
+      <div class="card">
+        <div class="label">Přeplatíte</div>
+        <div class="value" id="outOver"></div>
+        <div class="sub" id="outOverSub"></div>
+      </div>
+    </section>
+
+    <ul class="alerts" id="alerts"></ul>
+
+    <section class="panel rep-example">
+      <div class="panel-head">
+        <h2>Modelový příklad (obdoba reprezentativního příkladu)</h2>
+        <div class="tabs no-print"><button type="button" id="print">Tisk / PDF</button></div>
+      </div>
+      <div id="repText"></div>
+      <p class="small muted">Výše úvěru <span id="outLoan"></span>, LTV <span id="outLtv"></span>. RPSN je vypočtena podle přílohy č. 1 zákona č. 257/2016 Sb., o spotřebitelském úvěru, a zaokrouhlena na jedno desetinné místo.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Ukazatele ČNB a bonita</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th class="text">Ukazatel</th><th>Vaše hodnota</th><th>Limit / praxe</th><th>Stav</th></tr></thead>
+          <tbody id="indicators"></tbody>
+        </table>
+      </div>
+      <p class="small" id="affordability"></p>
+      <p class="small muted" id="cnbNote"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Průběh splácení</h2>
+      <div class="chart-box">
+        <svg id="chart" class="chart" role="img" aria-label="Graf ročního rozdělení splátek na jistinu a úrok a zůstatku dluhu"></svg>
+        <div class="chart-tip" id="chartTip"></div>
+      </div>
+      <div class="legend">
+        <span style="--c:var(--principal)">Splacená jistina za rok</span>
+        <span style="--c:var(--interest)">Zaplacené úroky za rok</span>
+        <span style="--c:var(--balance)">Zůstatek dluhu (pravá osa)</span>
+      </div>
+    </section>
+
+    <div class="grid2">
+      <section class="panel">
+        <h2>Co se stane po skončení fixace</h2>
+        <p class="small" id="fixSummary"></p>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Změna sazby</th><th>Nová sazba</th><th>Nová splátka</th><th>Rozdíl</th><th>Podíl na příjmu</th></tr></thead>
+            <tbody id="stress"></tbody>
+          </table>
+        </div>
+        <p class="small muted">Před koncem fixace vám banka oznámí novou sazbu. Do 3 měsíců od tohoto oznámení můžete úvěr bez sankce zcela či zčásti splatit, tedy i refinancovat u jiné banky (§ 117 zákona č. 257/2016 Sb.).</p>
+      </section>
+
+      <section class="panel">
+        <h2>Mimořádné splátky</h2>
+        <p id="extraResult"></p>
+        <h2 style="margin-top:18px">Daňový odpočet úroků</h2>
+        <div id="taxBlock">
+          <table><tbody id="taxResult"></tbody></table>
+          <p class="small muted" id="taxNote"></p>
+        </div>
+        <p class="small" id="taxInvestNote" hidden>U investiční nemovitosti (pronájem) nelze úroky odečíst jako nezdanitelnou část základu daně. Lze je ale uplatnit jako výdaj u příjmů z nájmu (§ 9 ZDP), pokud nepoužíváte paušální výdaje.</p>
+      </section>
+    </div>
+
+    <div class="grid2">
+      <section class="panel">
+        <h2>Jednorázové náklady při koupi</h2>
+        <table>
+          <tbody id="upfront"></tbody>
+          <tfoot><tr><td>Celkem potřebujete</td><td id="upfrontTotal"></td></tr></tfoot>
+        </table>
+        <p class="small" id="reserve"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Nájem vs. hypotéka</h2>
+        <div id="rentResult"></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Splátkový kalendář</h2>
+        <div class="tabs no-print"><button type="button" id="csv">Stáhnout CSV</button></div>
+      </div>
+      <p class="small muted">Kliknutím na rok zobrazíte jednotlivé měsíční splátky. Kalendář předpokládá neměnnou sazbu po celou dobu splatnosti.</p>
+      <div class="schedule-scroll">
+        <table>
+          <thead><tr><th>Období</th><th>Zaplaceno</th><th>Jistina</th><th>Úrok</th><th>Zůstatek</th></tr></thead>
+          <tbody id="schedule"></tbody>
+          <tfoot id="scheduleFoot"></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" id="info">
+      <h2>Co byste měli vědět, než si hypotéku vezmete</h2>
+      <div class="info-grid" id="infoGrid"></div>
+    </section>
+
+    <section class="disclaimer">
+      <p><strong>Upozornění:</strong> Výsledky jsou orientační a slouží pouze pro informaci. Nejedná se o nabídku úvěru, návrh na uzavření smlouvy, předsmluvní informace (ESIS) ani o finanční či investiční poradenství. Skutečné podmínky (úroková sazba, poplatky, výše úvěru) stanoví věřitel na základě posouzení vaší úvěruschopnosti, hodnoty nemovitosti a aktuálních tržních podmínek. Před uzavřením smlouvy si vyžádejte ESIS a porovnejte nabídky více poskytovatelů.</p>
+      <p>Provozovatel kalkulačky není věřitelem ani zprostředkovatelem spotřebitelského úvěru a úvěry nenabízí ani nezprostředkovává. Výpočet nenahrazuje posouzení úvěruschopnosti (§ 86 zákona č. 257/2016 Sb.). Uvedené sazby jsou průměry trhu, nikoli nabídka. Za rozhodnutí učiněná na základě výpočtu neneseme odpovědnost.</p>
+      <p>Legislativní a tržní údaje jsou platné k <strong id="validAt"></strong>. Zdroje: zákon č. 257/2016 Sb., o spotřebitelském úvěru; doporučení ČNB k hypotečním úvěrům; zákon č. 586/1992 Sb., o daních z příjmů; Swiss Life Hypoindex.</p>
+    </section>
+  </main>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap">Hypoteční kalkulačka · orientační výpočet · <a href="tests.html">testy výpočtů</a></div>
+</footer>
+
+<script src="js/config.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/info.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
